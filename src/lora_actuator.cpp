@@ -58,12 +58,12 @@ void setFlag(void)
 void setup()
 {
     pinMode(ACT_LED, OUTPUT);
-    digitalWrite(ACT_LED, HIGH);
+    digitalWrite(ACT_LED, LOW);
 
     Serial.begin(115200);
 
     Serial.println();
-    Serial.println("Actuator starting (test)");
+    Serial.println("Actuator starting ");
     SPI.setMOSI(LORA_MOSI);
     SPI.setMISO(LORA_MISO);
     SPI.setSCLK(LORA_SCK);
