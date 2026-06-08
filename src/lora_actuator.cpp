@@ -1,19 +1,13 @@
 #include <Arduino.h>
 #include <RadioLib.h>
-// #include <HardwareSerial.h>
 #include <SPI.h>
 
 #include "protocol.h"
 
-// HardwareSerial Serial(PA10, PA9);
 
 // ------------------------------------------------------------
 // SX1262 wiring
 // ------------------------------------------------------------
-// static const uint8_t PIN_NSS  = PB8;
-// static const uint8_t PIN_BUSY = PA8;
-// static const uint8_t PIN_RST  = PB7;
-// static const uint8_t PIN_DIO1 = PA7;
 // SPI1
 static const uint8_t LORA_SCK  = PB3;
 static const uint8_t LORA_MISO = PB4;
