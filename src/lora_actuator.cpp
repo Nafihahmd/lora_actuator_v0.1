@@ -17,7 +17,7 @@ static const uint8_t LORA_MOSI = PB5;
 // LoRa Actuator Pin Definitions
 static const uint8_t LORA_NSS = PB8;
 static const uint8_t LORA_BUSY = PA8;
-static const uint8_t LORA_DIO1 = PA7;
+static const uint8_t LORA_DIO1 = PA0;
 static const uint8_t LORA_RST = PB7;
 
 // LoRa Controller Pin Definitions
@@ -32,6 +32,9 @@ static const uint8_t TST_LED = PC15;
 
 // Create LoRa instance using RadioLib (CS, IRQ/DIO1, RST, BUSY)
 SX1262 radio = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
+
+// Clock configuration
+extern "C" void SystemClock_Config(void);
 
 // ------------------------------------------------------------
 // Global Variables
@@ -52,6 +55,10 @@ void setFlag(void)
     receivedFlag = true;
 }
 
+/**
+ * @brief Restart the radio receiver in duty cycle mode.
+ * @return void
+ */
 static inline void restartRadioRx()
 {
     int state =
@@ -62,6 +69,36 @@ static inline void restartRadioRx()
         Serial.print("RX restart failed: ");
         Serial.println(state);
     }
+}
+
+/**
+ * @brief Enter low power mode by stopping the SPI and Serial interfaces, 
+ * suspending the system tick, and entering STOP mode.
+ * 
+ * @return void
+ */
+static void enterLowPower()
+{
+    Serial.flush();
+
+    Serial.end();
+    SPI.end();
+
+    HAL_SuspendTick();
+
+    HAL_PWR_EnterSTOPMode(
+        PWR_LOWPOWERREGULATOR_ON,
+        PWR_STOPENTRY_WFI);
+    HAL_ResumeTick();
+    __WFI();
+    
+    SystemClock_Config();
+    SPI.setMOSI(LORA_MOSI);
+    SPI.setMISO(LORA_MISO);
+    SPI.setSCLK(LORA_SCK);
+    SPI.begin();
+
+    Serial.begin(115200);
 }
 
 // ------------------------------------------------------------
@@ -88,7 +125,7 @@ void setup()
     ConfigLoRa_t config;
     config.frequency = 865.0;
 
-    int state = radio.begin(865.0, 125.0, 12, 8, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 8, 0, false);
+    int state = radio.begin(865.0, 125.0, 10, 7, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 160, 0, false);
 
     if(state != RADIOLIB_ERR_NONE)
     {
@@ -119,6 +156,7 @@ void setup()
     }
 
     Serial.println("Listening...");
+    delay(2000);    // So that I can flash without breaking the reset button at the right time
 }
 
 // ------------------------------------------------------------
@@ -126,27 +164,9 @@ void setup()
 // ------------------------------------------------------------
 void loop()
 {
-    if(pulseActive)
-    {
-        if((int32_t)(millis() - pulseEndMs) >= 0)
-        {
-            pulseActive = false;
-
-            digitalWrite(ACT_LED, LOW);
-            digitalWrite(TST_LED, LOW);
-        }
-    }
     if(!receivedFlag)
     {
-        // HAL_SuspendTick();
-
-        // HAL_PWR_EnterSTOPMode(
-        //     PWR_LOWPOWERREGULATOR_ON,
-        //     PWR_STOPENTRY_WFI);
-
-        // HAL_ResumeTick();
-        __WFI();
-
+        enterLowPower();
         return;
     }
 
@@ -185,7 +205,7 @@ void loop()
     CmdFrame* frame =
         (CmdFrame*)rxBuf;
 
-    Serial.printf("[NetID: 0x%02X] [TTL: %d] [Type: 0x%02X]\n", frame->header.netId, frame->header.ttl, frame->payload.type);
+    // Serial.printf("[NetID: 0x%02X] [TTL: %d] [Type: 0x%02X]\n", frame->header.netId, frame->header.ttl, frame->payload.type);
 
     if(frame->header.netId != PROTO_NET_ID)
     {
@@ -268,8 +288,9 @@ void loop()
                 TST_LED,
                 HIGH);
 
-            pulseActive = true;
-            pulseEndMs = millis() + PULSE_DURATION_MS;
+            delay(PULSE_DURATION_MS);
+            digitalWrite(ACT_LED, LOW);
+            digitalWrite(TST_LED, LOW);
         }
         else
         {
@@ -300,11 +321,11 @@ void loop()
         restartRadioRx();
     }
 
-    Serial.print("RSSI: ");
-    Serial.println(radio.getRSSI());
+    // Serial.print("RSSI: ");
+    // Serial.println(radio.getRSSI());
 
-    Serial.print("SNR: ");
-    Serial.println(radio.getSNR());
+    // Serial.print("SNR: ");
+    // Serial.println(radio.getSNR());
 
     restartRadioRx();
 }
