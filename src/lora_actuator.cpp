@@ -125,7 +125,7 @@ void setup()
     ConfigLoRa_t config;
     config.frequency = 865.0;
 
-    int state = radio.begin(865.0, 125.0, 10, 7, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 160, 0, false);
+    int state = radio.begin(865.0, 125.0, 10, 7, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, 22, 180, 0, false);
 
     if(state != RADIOLIB_ERR_NONE)
     {
@@ -154,9 +154,9 @@ void setup()
             delay(1000);
         }
     }
+    delay(2000);    // So that I can flash without breaking the reset button at the right time
 
     Serial.println("Listening...");
-    delay(2000);    // So that I can flash without breaking the reset button at the right time
 }
 
 // ------------------------------------------------------------
