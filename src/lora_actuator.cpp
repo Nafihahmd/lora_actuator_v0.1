@@ -30,6 +30,19 @@ static const uint8_t LORA_RST = PB7;
 static const uint8_t ACT_LED = PC14;
 static const uint8_t TST_LED = PC15;
 
+// Unused Pins
+// static const uint8_t UNUSED_PINS[] = {
+//     PB0,   // DIO2
+//     PB1,   // DIO3
+//     PB2,   // RX_EN
+//     PB6,   // TX_EN
+//     PA7,   // Fuel Guage
+//     PA8,   // Shared with BUSY
+//     PA9,   // Rx
+//     PA10,  // Tx
+//     PA11,  // SCL
+//     PA12,  // SDA
+// };
 // Create LoRa instance using RadioLib (CS, IRQ/DIO1, RST, BUSY)
 SX1262 radio = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
 
