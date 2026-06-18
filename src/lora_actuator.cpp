@@ -25,16 +25,21 @@ static const uint8_t LORA_RST = PB7;
 // static const uint8_t LORA_DIO1 = PA0;   // Shared with Wake Pin
 // static const uint8_t LORA_RST  = PB7;
 
+// GPIO Pin Definitions
+static const uint8_t ACT_LED = PC14;
+static const uint8_t TST_LED = PC15;
+
 // Create LoRa instance using RadioLib (CS, IRQ/DIO1, RST, BUSY)
 SX1262 radio = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
 
 // ------------------------------------------------------------
-// Actuator Channels
+// Global Variables
 // ------------------------------------------------------------
 static const uint8_t ACC_CHANNEL = 0;
+#define PULSE_DURATION_MS 1000
+volatile bool pulseActive = false;
+volatile uint32_t pulseEndMs = 0;
 
-
-static const uint8_t ACT_LED = PC14;
 // ------------------------------------------------------------
 // Receive flag
 // ------------------------------------------------------------
@@ -53,11 +58,15 @@ void setup()
 {
     pinMode(ACT_LED, OUTPUT);
     digitalWrite(ACT_LED, LOW);
+    pinMode(TST_LED, OUTPUT);
+    digitalWrite(TST_LED, LOW);
+    pinMode(LORA_DIO1, INPUT_PULLDOWN);
 
     Serial.begin(115200);
 
     Serial.println();
     Serial.println("Actuator starting ");
+    Serial.println(" Channel: " + String(ACC_CHANNEL));
     SPI.setMOSI(LORA_MOSI);
     SPI.setMISO(LORA_MISO);
     SPI.setSCLK(LORA_SCK);
@@ -104,6 +113,16 @@ void setup()
 // ------------------------------------------------------------
 void loop()
 {
+    if(pulseActive)
+    {
+        if((int32_t)(millis() - pulseEndMs) >= 0)
+        {
+            pulseActive = false;
+
+            digitalWrite(ACT_LED, LOW);
+            digitalWrite(TST_LED, LOW);
+        }
+    }
     if(!receivedFlag)
     {
         return;
@@ -205,21 +224,7 @@ void loop()
             RES_ALREADY_FIRED,
             txBuf,
             &txLen);
-
-        if(!fired)
-        {
-            Serial.println("TRIGGER RECEIVED");
-            fired = true;
-
-            digitalWrite(
-                ACT_LED,
-                HIGH);
-        }
-        else
-        {
-            Serial.println("TRIGGER RECEIVED, BUT ALREADY FIRED");
-        }
-
+        /* Send ACK First */
         state = radio.transmit(txBuf, txLen);
         if(state != RADIOLIB_ERR_NONE)
         {
@@ -229,7 +234,27 @@ void loop()
 
         radio.finishTransmit();
 
-        radio.startReceive();
+        if(!fired)
+        {
+            Serial.println("TRIGGER RECEIVED");
+            fired = true;
+
+            digitalWrite(
+                ACT_LED,
+                HIGH);
+            digitalWrite(
+                TST_LED,
+                HIGH);
+
+            pulseActive = true;
+            pulseEndMs = millis() + PULSE_DURATION_MS;
+        }
+        else
+        {
+            Serial.println("TRIGGER RECEIVED, BUT ALREADY FIRED");
+        }
+
+        restartRadioRx();
     }
     else if(frame->payload.command == CMD_STATUS)
     {
