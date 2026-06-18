@@ -2,6 +2,7 @@
 #include <RadioLib.h>
 #include <SPI.h>
 
+#include "stm32g0xx_hal.h"
 #include "protocol.h"
 
 
@@ -51,6 +52,18 @@ void setFlag(void)
     receivedFlag = true;
 }
 
+static inline void restartRadioRx()
+{
+    int state =
+        radio.startReceiveDutyCycleAuto();
+
+    if(state != RADIOLIB_ERR_NONE)
+    {
+        Serial.print("RX restart failed: ");
+        Serial.println(state);
+    }
+}
+
 // ------------------------------------------------------------
 // Setup
 // ------------------------------------------------------------
@@ -92,7 +105,7 @@ void setup()
 
     radio.setPacketReceivedAction(setFlag);
 
-    state = radio.startReceive();
+    state = radio.startReceiveDutyCycleAuto();
 
     if(state != RADIOLIB_ERR_NONE)
     {
@@ -125,6 +138,15 @@ void loop()
     }
     if(!receivedFlag)
     {
+        // HAL_SuspendTick();
+
+        // HAL_PWR_EnterSTOPMode(
+        //     PWR_LOWPOWERREGULATOR_ON,
+        //     PWR_STOPENTRY_WFI);
+
+        // HAL_ResumeTick();
+        __WFI();
+
         return;
     }
 
@@ -145,7 +167,7 @@ void loop()
         Serial.print("RX error: ");
         Serial.println(state);
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
 
@@ -156,7 +178,7 @@ void loop()
         Serial.print("Unexpected length: ");
         Serial.println(packetLength);
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
 
@@ -169,7 +191,7 @@ void loop()
     {
         Serial.println("Bad NetID");
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
 
@@ -177,7 +199,7 @@ void loop()
     {
         Serial.println("Not CMD");
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
 
@@ -190,7 +212,7 @@ void loop()
     {
         Serial.println("CRC mismatch");
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
     
@@ -198,7 +220,7 @@ void loop()
     {
         Serial.println("Not my channel");
 
-        radio.startReceive();
+        restartRadioRx();
         return;
     }
 
@@ -275,7 +297,7 @@ void loop()
         radio.transmit(txBuf, txLen);
         radio.finishTransmit();
 
-        radio.startReceive();
+        restartRadioRx();
     }
 
     Serial.print("RSSI: ");
@@ -284,5 +306,5 @@ void loop()
     Serial.print("SNR: ");
     Serial.println(radio.getSNR());
 
-    radio.startReceive();
+    restartRadioRx();
 }
