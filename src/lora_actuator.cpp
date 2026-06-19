@@ -29,6 +29,7 @@ static const uint8_t LORA_RST = PB7;
 // GPIO Pin Definitions
 static const uint8_t ACT_LED = PC14;
 static const uint8_t TST_LED = PC15;
+static const uint8_t BATTERY_PIN = PA1;
 
 // Unused Pins
 // static const uint8_t UNUSED_PINS[] = {
@@ -52,7 +53,7 @@ extern "C" void SystemClock_Config(void);
 // ------------------------------------------------------------
 // Global Variables
 // ------------------------------------------------------------
-static const uint8_t ACC_CHANNEL = 2;
+static const uint8_t ACC_CHANNEL = 1;
 #define PULSE_DURATION_MS 1000
 static uint8_t lastCounter = 0xFF;
 
@@ -67,6 +68,52 @@ void setFlag(void)
     receivedFlag = true;
 }
 
+/**
+ * Read battery voltage
+ */
+float readBatteryVoltage()
+{
+    constexpr uint8_t NUM_SAMPLES = 16;
+
+    uint32_t sum = 0;
+
+    for(uint8_t i = 0; i < NUM_SAMPLES; i++)
+    {
+        sum += analogRead(BATTERY_PIN);
+        delayMicroseconds(100);
+    }
+
+    float adc =
+        (float)sum / NUM_SAMPLES;
+
+    // STM32duino default ADC resolution
+    constexpr float ADC_MAX = 4095.0f;
+
+    // 3.3V reference
+    constexpr float VREF = 3.3f;
+
+    float vadc =
+        (adc / ADC_MAX) * VREF;
+
+    float vbat =
+        vadc * 2.0f;
+
+    return vbat;
+}
+/**
+ * Get battery percentage
+ */
+uint8_t batteryPercent()
+{
+    float v = readBatteryVoltage();
+
+    if(v >= 4.20f) return 100;
+    if(v <= 3.20f) return 0;
+
+    return (uint8_t)(
+        ((v - 3.20f) * 100.0f) /
+        (4.20f - 3.20f));
+}
 /**
  * @brief Restart the radio receiver in duty cycle mode.
  * @return void
@@ -133,6 +180,7 @@ void setup()
     SPI.setMISO(LORA_MISO);
     SPI.setSCLK(LORA_SCK);
     SPI.begin();
+    analogReadResolution(12);
 
     ConfigLoRa_t config;
     config.frequency = 865.0;
@@ -166,6 +214,13 @@ void setup()
             delay(1000);
         }
     }
+    float vbat = readBatteryVoltage();
+
+    // Serial.print("Battery: ");
+    // Serial.print(vbat, 2);
+    // Serial.println(" V");
+    u_int8_t battery = batteryPercent();
+    Serial.printf("Battery: %d\% \n", battery);
     delay(2000);    // So that I can flash without breaking the reset button at the right time
 
     Serial.println("Listening...");
@@ -324,15 +379,17 @@ void loop()
     {
         uint8_t txBuf[16];
         size_t txLen;
+        uint8_t bat_percent=0;
 
         Serial.println("STATUS REQUEST RECEIVED");
+        bat_percent = batteryPercent();
         buildStatusPacket(
             frame->payload.channel,
             frame->payload.counter,
             fired ?
                 STATE_FIRED :
                 STATE_READY,
-            100,
+            bat_percent,
             txBuf,
             &txLen);
 
