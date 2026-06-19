@@ -52,10 +52,9 @@ extern "C" void SystemClock_Config(void);
 // ------------------------------------------------------------
 // Global Variables
 // ------------------------------------------------------------
-static const uint8_t ACC_CHANNEL = 0;
+static const uint8_t ACC_CHANNEL = 2;
 #define PULSE_DURATION_MS 1000
-volatile bool pulseActive = false;
-volatile uint32_t pulseEndMs = 0;
+static uint8_t lastCounter = 0xFF;
 
 // ------------------------------------------------------------
 // Receive flag
@@ -129,7 +128,7 @@ void setup()
 
     Serial.println();
     Serial.println("Actuator starting ");
-    Serial.println(" Channel: " + String(ACC_CHANNEL));
+    Serial.println("Channel: " + String(ACC_CHANNEL+1));
     SPI.setMOSI(LORA_MOSI);
     SPI.setMISO(LORA_MISO);
     SPI.setSCLK(LORA_SCK);
@@ -256,15 +255,24 @@ void loop()
         restartRadioRx();
         return;
     }
+    
+    if(frame->payload.counter == lastCounter)
+    {
+        Serial.println("Duplicate packet");
+        restartRadioRx();
+        return;
+    }
 
-    Serial.print("Counter: ");
-    Serial.println(frame->payload.counter);
+    lastCounter = frame->payload.counter;
 
-    Serial.print("Channel: ");
-    Serial.println(frame->payload.channel);
+    // Serial.print("Counter: ");
+    // Serial.println(frame->payload.counter);
 
-    Serial.print("Command: ");
-    Serial.println(frame->payload.command);
+    // Serial.print("Channel: ");
+    // Serial.println(frame->payload.channel);
+
+    // Serial.print("Command: ");
+    // Serial.println(frame->payload.command);
 
     if(frame->payload.command == CMD_TRIGGER)
     {
